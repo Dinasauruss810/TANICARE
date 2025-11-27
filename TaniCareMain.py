@@ -1,4 +1,3 @@
-
 import os
 import csv
 import pandas as pd
@@ -285,7 +284,7 @@ def tambah_keranjang(username):
     subtotal = jumlah * int(prod.at[idx,'Harga'])
     cart.loc[len(cart)] = [username, prod.at[idx,'ID Produk'], jumlah, subtotal]
     cart.to_csv(KERANJANG_CSV, index=False)
-    # update stok (sama seperti kating style)
+    # update stok 
     prod.at[idx,'Stok'] = stok_avail - jumlah
     prod.at[idx,'Status'] = "Habis" if prod.at[idx,'Stok'] <= 0 else "Tersedia"
     prod.to_csv(STOK_CSV, index=False)
@@ -708,3 +707,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
