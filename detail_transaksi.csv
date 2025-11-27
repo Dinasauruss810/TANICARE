@@ -1,0 +1,7 @@
+ID Transaksi,ID Produk,Nama Produk,Jumlah,Harga Satuan,Total Harga
+T00001,P001,Pupuk Kompos,2,50000,100000
+T002,P002,Pupuk NPK,2,75000,150000
+T002,P002,Pupuk NPK,1,75000,75000
+T003,P004,Pupuk Kandang Sapi,4,6000,24000
+T003,P003,Pupuk Urea 46% N,1,13000,13000
+T003,P001,Pupuk Kompos Organik,3,8000,24000
