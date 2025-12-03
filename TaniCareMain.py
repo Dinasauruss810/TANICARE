@@ -5,7 +5,7 @@ from tabulate import tabulate
 from datetime import datetime
 
 # ======================================================
-# ASCII logo (TaniCare)
+# Logo (TaniCare)
 # ======================================================
 LOGO = """
 ╔════════════════════════════════════════════════════════════════════════════╗
@@ -31,9 +31,8 @@ KONSULT_CSV = "konsultasi.csv"
 
 DATE_FORMAT = "%d-%m-%Y %H:%M:%S"
 
-
 # ---------------------------
-# HELPERS ringan (inline)
+# HELPERS
 # ---------------------------
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -48,6 +47,24 @@ def gen_simple_id(prefix, df):
 
 def now_str():
     return datetime.now().strftime(DATE_FORMAT)
+
+def ensure_csv_exists(filename, columns):
+    """
+    Jika file CSV tidak ada, buat file baru dengan header columns.
+    columns: list of column names.
+    """
+    if not os.path.exists(filename):
+        df = pd.DataFrame(columns=columns)
+        df.to_csv(filename, index=False)
+
+# Pastikan file dasar ada (meminimalkan error saat akses pertama)
+ensure_csv_exists(PENGGUNA_CSV, ["Username","Password","Nama Lengkap","Alamat","Nomor Telepon","Role"])
+ensure_csv_exists(STOK_CSV, ["ID Produk","Nama Produk","Harga","Stok","Status"])
+ensure_csv_exists(KERANJANG_CSV, ["Username","ID Produk","Jumlah","Subtotal"])
+ensure_csv_exists(TRANS_CSV, ["ID Transaksi","Username","Tanggal Transaksi","Total Pembayaran","Status"])
+ensure_csv_exists(DETAIL_CSV, ["ID Transaksi","ID Produk","Nama Produk","Jumlah","Harga Satuan","Total Harga"])
+ensure_csv_exists(RIWAYAT_CSV, ["ID Riwayat","Username","Tanggal","Total Pengeluaran"])
+ensure_csv_exists(KONSULT_CSV, ["ID Pesan","Username Pengirim","Pesan","Balasan","Tanggal"])
 
 # ======================================================
 # AUTH (login/register)
@@ -175,7 +192,7 @@ def tambah_produk():
         print("Input tidak valid (harus angka).")
         input("Enter..."); return
 
-    # generate simple ID P###
+    # generate simple ID P### (menggunakan jumlah baris sekarang)
     pid = gen_simple_id("P", prod)
     status = "Tersedia" if stok > 0 else "Habis"
     prod.loc[len(prod)] = [pid, nama, harga, stok, status]
@@ -284,7 +301,7 @@ def tambah_keranjang(username):
     subtotal = jumlah * int(prod.at[idx,'Harga'])
     cart.loc[len(cart)] = [username, prod.at[idx,'ID Produk'], jumlah, subtotal]
     cart.to_csv(KERANJANG_CSV, index=False)
-    # update stok 
+    # update stok
     prod.at[idx,'Stok'] = stok_avail - jumlah
     prod.at[idx,'Status'] = "Habis" if prod.at[idx,'Stok'] <= 0 else "Tersedia"
     prod.to_csv(STOK_CSV, index=False)
@@ -320,16 +337,62 @@ def proses_checkout(username):
         input("Enter..."); return
     total = int(my['Subtotal'].sum())
     print("Total pembayaran: Rp", total)
-    try:
-        bayar = int(input("Bayar: ").strip())
-    except:
-        print("Input invalid.")
-        input("Enter..."); return
-    if bayar < total:
-        print("Uang tidak cukup.")
-        input("Enter..."); return
-    kembalian = bayar - total
 
+    # ----------------------------
+    # Opsi Metode Pembayaran
+    # ----------------------------
+    print("\nPilih metode pembayaran:")     
+    print("1. Tunai")
+    print("2. Transfer Bank")
+    print("3. E-Wallet")
+    metode = input("Masukkan pilihan metode pembayaran (1/2/3): ").strip()
+
+    if metode == "1":
+        # Tunai: loop sampai user masukkan cukup uang atau batal
+        while True:
+            try:
+                bayar = int(input("Masukkan jumlah uang tunai (ketik 0 untuk batal): ").strip())
+            except:
+                print("Input invalid. Masukkan angka.")
+                continue
+            if bayar == 0:
+                print("Pembayaran dibatalkan.")
+                input("Enter..."); return
+            if bayar < total:
+                print(f"Uang tidak cukup. Masih kurang Rp {total - bayar:,}.")
+                ulang = input("Coba lagi? (y/n): ").strip().lower()
+                if ulang == 'y':
+                    continue
+                else:
+                    print("Pembayaran dibatalkan.")
+                    input("Enter..."); return
+            else:
+                kembalian = bayar - total
+                print(f"Pembayaran tunai diterima. Kembalian: Rp {kembalian:,}")
+                break
+
+    elif metode == "2":
+        # Transfer Bank: tampilkan instruksi (tidak mengecek bukti)
+        print("\nSilahkan transfer ke rekening berikut:")
+        print("Bank ABC - 12345678 - a.n. TaniCare Store")
+        print("Catatan: Setelah transfer, simpan bukti transfer sebagai konfirmasi.")
+        input("Tekan Enter setelah selesai (atau simpan bukti untuk proses manual)...")
+
+    elif metode == "3":
+        # E-Wallet: tampilkan instruksi
+        print("\nSilahkan transfer ke E-Wallet berikut:")
+        print("Gopay / Dana / OVO - 0812345678 - a.n. TaniCare Store")
+        print("Catatan: Setelah transfer, simpan bukti transfer sebagai konfirmasi.")
+        input("Tekan Enter setelah selesai (atau simpan bukti untuk proses manual)...")
+
+    else:
+        print("Metode pembayaran salah!")
+        input("Enter..."); return
+
+    # ----------------------------
+    # Jika sampai sini, anggap pembayaran berhasil (tunai atau konfirmasi)
+    # Catat transaksi, detail, riwayat, dan kosongkan keranjang
+    # ----------------------------
     # catat transaksi
     try:
         trans = pd.read_csv(TRANS_CSV)
@@ -371,7 +434,7 @@ def proses_checkout(username):
     cart = cart[cart['Username'] != username]
     cart.to_csv(KERANJANG_CSV, index=False)
 
-    print(f"Transaksi {tid} berhasil dicatat. Kembalian: Rp {kembalian}")
+    print(f"Transaksi {tid} berhasil dicatat. Terima kasih telah berbelanja di TaniCare!")
     input("Enter...")
 
 def riwayat_pembeli(username):
@@ -490,7 +553,11 @@ def laporan_penjualan():
     elif pilihan == "2":
         try:
             trans = pd.read_csv(TRANS_CSV)
-            trans['__dt'] = pd.to_datetime(trans['Tanggal Transaksi'], dayfirst=True, errors='coerce')
+            trans['__dt'] = pd.to_datetime(
+                trans['Tanggal Transaksi'],
+                format="%d-%m-%Y %H:%M:%S",
+                errors='coerce'
+            )
             start = input("Tanggal mulai (DD-MM-YYYY): ").strip()
             end = input("Tanggal akhir (DD-MM-YYYY): ").strip()
             sd = pd.to_datetime(start, format='%d-%m-%Y')
@@ -653,8 +720,9 @@ def menu_admin(username):
             input("Enter...")
 
 def menu_pembeli(username):
+    # duplicate / compatibility with earlier names in some flows
     while True:
-        os.system('cls')
+        os.system('cls' if os.name == 'nt' else 'clear')
         print(f"=== MENU PEMBELI ({username}) ===")
         print("1. Lihat Produk")
         print("2. Tambah ke Keranjang")
@@ -682,7 +750,6 @@ def menu_pembeli(username):
             break
         else:
             input("Input salah...")
-
 
 # ======================================================
 # ENTRY POINT
